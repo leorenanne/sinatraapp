@@ -37,5 +37,5 @@ https://github.com/rea-cruitment/simple-sinatra-app
     "ParameterValue": "10.0.0.0/16"
   }
   ```
-* Run aws createstack <br/>
-`aws cloudformation create-stack --stack-name leoren-stack --template-body file://sinatra-cfn.json --parameters file://sinatra-cfn-params.json`
+* Run aws cloudformation createstack <br/>
+`aws cloudformation create-stack --stack-name my-stack --template-body file://sinatra-cfn.json --parameters file://sinatra-cfn-params.json`
