@@ -1,0 +1,176 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "AWS CloudFormation Sample Template AutoScalingMultiAZWithNotifications: Create a multi-az, load balanced and Auto Scaled sample web site running on an Apache Web Serever. The application is configured to span all Availability Zones in the region and is Auto-Scaled based on the CPU utilization of the web servers. Notifications will be sent to the operator email address on scaling events. The instances are load balanced with a simple health check against the default web page. **WARNING** This template creates one or more Amazon EC2 instances and an Elastic Load Balancer. You will be billed for the AWS resources used if you create a stack from this template.",
+
+  "Parameters" : {
+    "InstanceType" : {
+      "Description" : "WebServer EC2 instance type",
+      "Type" : "String",
+      "Default" : "t2.small",
+      "AllowedValues" : [ "t1.micro", "t2.nano", "t2.micro", "t2.small"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+
+    "KeyName" : {
+      "Description" : "The EC2 Key Pair to allow SSH access to the instances",
+      "Default": "stack-key",
+      "Type" : "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+    },
+
+    "VpcID" : {
+      "Description" : "VPC id to use",
+      "Type": "String",
+      "Default": "vpc1234"
+    },
+
+    "SubnetElb" : {
+      "Description" : "SubnetID of a Public Subnet where the Elb will be creted",
+      "Type": "String",
+      "Default": "subnet1234"
+    },
+
+    "SubnetInstance" : {
+      "Description" : "SubnetID of Subnet where Instances will be created, preferrably a Private one",
+      "Type": "String",
+      "Default": "subnet1234"
+    },
+
+    "PublicSubnetCidrIP" : {
+        "Description" : "Public Subnet CidrIP",
+        "Type": "String",
+        "Default": "10.0.0.0/16"
+    },
+
+    "Costcode" : {
+          "Description" : "Your team/LOB costcode for tagging resources",
+          "Type": "String",
+          "Default": "123"
+    }
+
+  },
+
+  "Resources" : {
+    "AutoScalingGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "LaunchConfigurationName" : { "Ref" : "LaunchConfig" },
+        "MinSize" : "1",
+        "MaxSize" : "3",
+        "LoadBalancerNames" : [ { "Ref" : "ElasticLoadBalancer" } ],
+        "Tags": [
+            {
+                "Key" : "costcode",
+                "Value": { "Ref" : "Costcode" },
+                "PropagateAtLaunch": true
+            },
+            {
+                "Key": "Name",
+                "Value": { "Fn::Join" : [ "", [ { "Ref" : "AWS::StackName" }, "-instance" ] ] },
+                "PropagateAtLaunch": true
+            }
+        ],
+
+        "VPCZoneIdentifier": [ { "Ref" : "SubnetInstance"} ]
+      }
+    },
+
+    "LaunchConfig" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Properties" : {
+        "KeyName" : { "Ref" : "KeyName" },
+        "ImageId" : "ami-1c47407f",
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+             "#!/bin/bash -xe\n",
+             "yum -y update\n",
+             "yum -y install git ruby-devel ruby-libs gcc\n",
+             "runuser -l ec2-user -c ",
+                "'cd /home/ec2-user; git clone https://github.com/rea-cruitment/simple-sinatra-app.git;",
+                "gem install bundler; gem install io-console;",
+                "cd simple-sinatra-app;",
+                "bundle install;",
+                "bundle exec rackup -o 0.0.0.0'\n"
+        ]]}},
+        "SecurityGroups": [{"Ref": "PrivateSecurityGroup"}]
+      }
+
+    },
+
+    "ElasticLoadBalancer" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "LoadBalancerName": { "Fn::Join" : [ "", [ { "Ref" : "AWS::StackName" }, "-elb" ] ] },
+        "CrossZone" : "true",
+        "Listeners" : [ {
+          "LoadBalancerPort" : "22",
+          "InstancePort" : "22",
+          "Protocol" : "TCP"
+        },{
+          "LoadBalancerPort" : "80",
+          "InstancePort" : "9292",
+          "Protocol" : "TCP"
+        }
+       ],
+        "HealthCheck" : {
+          "Target" : "TCP:9292",
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "30",
+          "Timeout" : "5"
+        },
+        "Subnets": [ { "Ref" : "SubnetElb" }],
+        "SecurityGroups": [{"Ref": "PublicSecurityGroup"}]
+      }
+    },
+
+    "PrivateSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable SSH access and HTTP from the load balancer only",
+        "SecurityGroupIngress" : [ {
+          "IpProtocol" : "tcp",
+          "FromPort" : "22",
+          "ToPort" : "22",
+          "CidrIp" : { "Ref" : "PublicSubnetCidrIP" }
+        },{
+          "IpProtocol" : "tcp",
+          "FromPort" : "9292",
+          "ToPort" : "9292",
+          "CidrIp" : { "Ref" : "PublicSubnetCidrIP" }
+        }
+      ],
+        "VpcId" : { "Ref" : "VpcID" }
+      }
+    },
+
+    "PublicSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable SSH access and HTTP from the Internet Gateway",
+        "SecurityGroupIngress" : [ {
+          "IpProtocol" : "tcp",
+          "FromPort" : "22",
+          "ToPort" : "22",
+          "CidrIp" : "0.0.0.0/0"
+        },
+        {
+          "IpProtocol" : "tcp",
+          "FromPort" : "80",
+          "ToPort" : "80",
+          "CidrIp" : "0.0.0.0/0"
+        }],
+        "VpcId" : { "Ref" : "VpcID" }
+      }
+    }
+
+  },
+
+  "Outputs" : {
+    "URL" : {
+      "Description" : "The URL of the website",
+      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "ElasticLoadBalancer", "DNSName" ]}]]}
+    }
+  }
+}

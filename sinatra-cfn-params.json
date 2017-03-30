@@ -1,0 +1,30 @@
+[
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.small"
+  },
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "stack-key"
+  },
+  {
+    "ParameterKey": "VpcID",
+    "ParameterValue": "vpc1234"
+  },
+  {
+    "ParameterKey": "SubnetElb",
+    "ParameterValue": "subnetPub123"
+  },
+  {
+    "ParameterKey": "SubnetInstance",
+    "ParameterValue": "subnetPriv123"
+  },
+  {
+    "ParameterKey": "PublicSubnetCidrIP",
+    "ParameterValue": "10.0.0.0/16"
+  },
+  {
+    "ParameterKey": "Costcode",
+    "ParameterValue": "123"
+  }
+]
